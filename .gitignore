@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+results/*.json
+model.joblib
+.pytest_cache/
+.env
