@@ -36,5 +36,13 @@ services:
       postgres: {condition: service_healthy}
     healthcheck: *py-health
 
+  gateway:
+    image: nginx:1.27
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports: ["8080:80"]
+    depends_on:
+      catalog: {condition: service_healthy}
+
 volumes:
   pgdata:
