@@ -43,6 +43,20 @@ services:
     ports: ["8080:80"]
     depends_on:
       catalog: {condition: service_healthy}
+  
+  inventory-stub:
+    build: ./stubs/inventory-stub
+    profiles: ["stubs"]
+    networks:
+      default:
+        aliases: [inventory]
+
+  risk-stub:
+    build: ./stubs/risk-stub
+    profiles: ["stubs"]
+    networks:
+      default:
+        aliases: [risk]
 
 volumes:
   pgdata:
