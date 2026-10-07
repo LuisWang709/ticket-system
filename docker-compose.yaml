@@ -10,6 +10,8 @@ services:
     command: ["postgres", "-c", "max_connections=300"]
     environment:
       POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -44,12 +46,19 @@ services:
     depends_on:
       catalog: {condition: service_healthy}
   
-  inventory-stub:
-    build: ./stubs/inventory-stub
-    profiles: ["stubs"]
-    networks:
-      default:
-        aliases: [inventory]
+  inventory:
+    build: ./services/inventory
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/inventory
+      REDIS_URL: redis://redis:6379/0
+      HOLD_SECONDS: "60"
+      INVENTORY_MODE: "atomic"
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    ports: [ "8002:8000" ]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck: *py-health
 
   risk-stub:
     build: ./stubs/risk-stub
