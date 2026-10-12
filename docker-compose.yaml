@@ -51,7 +51,7 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/inventory
       REDIS_URL: redis://redis:6379/0
-      HOLD_SECONDS: "60"
+      HOLD_SECONDS: "30"          # <--- 改为 30（满足契约 Demo 演示时长）
       INVENTORY_MODE: "atomic"
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
     ports: [ "8002:8000" ]
