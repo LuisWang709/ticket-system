@@ -33,9 +33,12 @@ CREATE TABLE IF NOT EXISTS reservations (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_reservations_order_id ON reservations(order_id);
 
--- 初始化测试档位：对应契约测试的 tier-1 和 VIP
 INSERT INTO ticket_inventory (tier_id, total_capacity, available_tickets, reserved_tickets, confirmed_tickets)
 VALUES
+    ('1', 100, 100, 0, 0),
+    ('2', 100, 100, 0, 0),
+    ('3', 100, 100, 0, 0),
     ('VIP', 100, 100, 0, 0),
     ('tier-1', 100, 100, 0, 0)
-ON CONFLICT (tier_id) DO NOTHING;
+ON CONFLICT (tier_id) DO UPDATE
+SET total_capacity = EXCLUDED.total_capacity;
