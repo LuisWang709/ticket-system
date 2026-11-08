@@ -4,3 +4,8 @@ results/*.json
 model.joblib
 .pytest_cache/
 .env
+
+# Editor and OS files: keeps four people from fighting over them in git.
+.idea/
+*.iml
+.DS_Store
