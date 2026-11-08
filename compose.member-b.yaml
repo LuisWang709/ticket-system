@@ -1,0 +1,81 @@
+# Standalone iteration-1 demo. The team's docker-compose.yaml is still the main configuration.
+# Run: docker compose -p ticket-b-v1 -f compose.member-b.yaml up -d --build --wait
+x-health: &health
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+  interval: 3s
+  timeout: 5s
+  retries: 20
+  start_period: 10s
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - member_b_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  inventory:
+    build: ./services/inventory
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/inventory
+      REDIS_URL: redis://redis:6379/0
+      HOLD_SECONDS: "30"
+      INVENTORY_MODE: atomic
+    ports: ["127.0.0.1:18002:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck: *health
+
+  order:
+    build: ./services/order
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/orders
+      INVENTORY_URL: http://inventory:8000
+    ports: ["127.0.0.1:18003:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      inventory: {condition: service_healthy}
+    healthcheck: *health
+
+  payment:
+    build: ./services/payment
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/payments
+      DELAY_MS: "0"
+      FAIL_RATE: "0"
+    ports: ["127.0.0.1:18004:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck: *health
+
+  tests:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: tests/member_b/Dockerfile
+    environment:
+      TEST_ADMIN_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
+      LIVE_ORDER_URL: http://order:8000
+      LIVE_PAYMENT_URL: http://payment:8000
+    depends_on:
+      order: {condition: service_healthy}
+      payment: {condition: service_healthy}
+
+volumes:
+  member_b_data:

@@ -4,6 +4,7 @@ x-py-health: &py-health
   timeout: 3s
   retries: 20
   start_period: 10s
+
 services:
   postgres:
     image: postgres:16
@@ -29,6 +30,16 @@ services:
       timeout: 3s
       retries: 20
 
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports: ["15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
   catalog:
     build: ./services/catalog
     environment:
@@ -45,19 +56,42 @@ services:
     ports: ["8080:80"]
     depends_on:
       catalog: {condition: service_healthy}
-  
+
   inventory:
     build: ./services/inventory
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/inventory
       REDIS_URL: redis://redis:6379/0
-      HOLD_SECONDS: "30"          # <--- 改为 30（满足契约 Demo 演示时长）
-      INVENTORY_MODE: "atomic"
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      HOLD_SECONDS: "30"
+      INVENTORY_MODE: "atomic"
     ports: [ "8002:8000" ]
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    healthcheck: *py-health
+
+  order:
+    build: ./services/order
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/orders
+      INVENTORY_URL: http://inventory:8000
+    ports: [ "8003:8000" ]
+    depends_on:
+      postgres: { condition: service_healthy }
+      inventory: { condition: service_healthy }
+    healthcheck: *py-health
+
+  payment:
+    build: ./services/payment
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/payments
+      DELAY_MS: "0"
+      FAIL_RATE: "0"
+    ports: [ "8004:8000" ]
+    depends_on:
+      postgres: { condition: service_healthy }
     healthcheck: *py-health
 
   risk-stub:
@@ -66,6 +100,26 @@ services:
     networks:
       default:
         aliases: [risk]
+
+  inventory-stub:
+    build: ./stubs/inventory-stub
+    profiles: ["stubs"]
+    networks:
+      default:
+        aliases: [inventory-stub]
+
+  tests:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: tests/member_b/Dockerfile
+    environment:
+      TEST_ADMIN_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
+      LIVE_ORDER_URL: http://order:8000
+      LIVE_PAYMENT_URL: http://payment:8000
+    depends_on:
+      order: {condition: service_healthy}
+      payment: {condition: service_healthy}
 
 volumes:
   pgdata:
